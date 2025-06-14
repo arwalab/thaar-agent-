@@ -39,11 +39,15 @@ def test_google_search(item_name):
     try:
         driver.get("https://www.google.com")
 
-        WebDriverWait(driver, 10).until(
+        search = WebDriverWait(driver, 10).until(
             EC.visibility_of_element_located((By.NAME, "q"))
         )
 
-        search = driver.find_element(By.NAME, "q")
+        # Make sure it's focused and visible before typing
+        driver.execute_script("arguments[0].scrollIntoView(true);", search)
+        time.sleep(1)
+        search.click()
+        time.sleep(0.5)
         search.send_keys(item_name)
         search.send_keys(Keys.RETURN)
 
