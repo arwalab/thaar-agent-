@@ -62,7 +62,7 @@ def add_to_cart_carrefour(item_name):
         try:
             print("🔎 Waiting for search bar...", flush=True)
             search = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[data-testid='header_search__inp']"))
+                EC.visibility_of_element_located((By.CSS_SELECTOR, "input[data-testid='header_search__inp']"))
             )
             search.send_keys(item_name)
             search.send_keys(Keys.RETURN)
