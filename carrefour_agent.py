@@ -38,7 +38,7 @@ def add_to_cart_carrefour(item_name):
         wait = WebDriverWait(driver, 20)
 
         # Wait for search bar to appear
-        search_box = wait.until(
+        search_input = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[data-testid='header_search__inp']"))
         )
 
