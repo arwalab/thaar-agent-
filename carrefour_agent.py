@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 import os
 import json
@@ -29,9 +28,7 @@ def attach_to_thaar_session():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.binary_location = "/usr/bin/chromium"
 
-    driver = webdriver.Chrome(
-        options=chrome_options,
-    )
+    driver = webdriver.Chrome(options=chrome_options)
     return driver
 
 def add_to_cart_carrefour(item_name):
@@ -39,9 +36,12 @@ def add_to_cart_carrefour(item_name):
     try:
         driver.get("https://www.carrefourksa.com/mafsau/en/")
         time.sleep(4)
+
+        # ✅ Fixed selector: use ID based on inspected HTML
         search = driver.find_element(By.ID, "search-bar")
         search.send_keys(item_name)
         search.send_keys(Keys.RETURN)
+
         print(f"📦 Reordering: {item_name}")
         time.sleep(5)
     finally:
@@ -60,6 +60,7 @@ def reorder_item():
         add_to_cart_carrefour(item)
         return jsonify({"item": item, "status": "success"}), 200
     except Exception as e:
+        print(f"❌ Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def main():
