@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import os
 import json
+import uuid
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 from selenium import webdriver
@@ -13,15 +14,18 @@ import time
 
 app = Flask(__name__)
 
-# Optional future: Load items from Google Sheets
+# Optional: Load inventory data from Google Sheets
 def load_items_from_sheet():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds_dict = json.loads(os.environ["GOOGLE_SHEETS_CREDENTIALS_JSON"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1qhPYmOREyR8ShPJbMAxmvzD96cVluToZ5iLA94KxHng/edit").worksheet("Food inventory")
+    sheet = client.open_by_url(
+        "https://docs.google.com/spreadsheets/d/1qhPYmOREyR8ShPJbMAxmvzD96cVluToZ5iLA94KxHng/edit"
+    ).worksheet("Food inventory")
     return sheet.get_all_records()
 
+# Set up headless browser session
 def attach_to_thaar_session():
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
@@ -31,31 +35,56 @@ def attach_to_thaar_session():
 
     return webdriver.Chrome(options=chrome_options)
 
+# Main automation logic
 def add_to_cart_carrefour(item_name):
     driver = attach_to_thaar_session()
     try:
         driver.get("https://www.carrefourksa.com/mafsau/en/")
         wait = WebDriverWait(driver, 20)
 
-        # Wait for search bar to appear
-        search_input = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[data-testid='header_search__inp']"))
-        )
+        try:
+            search_input = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[data-testid='header_search__inp']"))
+            )
+        except Exception:
+            print("⚠️ Search bar not found immediately. Checking overlays...")
+
+            try:
+                cookie_btn = driver.find_element(By.CSS_SELECTOR, "button#onetrust-accept-btn-handler")
+                cookie_btn.click()
+                print("✅ Cookie popup dismissed.")
+            except:
+                print("⚠️ No cookie banner.")
+
+            try:
+                lang_popup = driver.find_element(By.CSS_SELECTOR, ".languageSelectionContainer .closeBtn")
+                lang_popup.click()
+                print("✅ Language/location popup dismissed.")
+            except:
+                print("⚠️ No language popup.")
+
+            # Retry
+            search_input = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[data-testid='header_search__inp']"))
+            )
 
         search_input.clear()
         search_input.send_keys(item_name)
         search_input.send_keys(Keys.RETURN)
-
         print(f"📦 Reordering: {item_name}")
-        time.sleep(5)  # optional: wait for results
+        time.sleep(5)
+
     except Exception as e:
-        # Dump page source for debugging
-        with open("carrefour_error_dump.html", "w", encoding="utf-8") as f:
-            f.write(driver.page_source)
-        raise Exception(f"Carrefour search bar not found (timeout): {str(e)}")
+        screenshot_dir = "/app/failures"
+        os.makedirs(screenshot_dir, exist_ok=True)
+        filename = f"{screenshot_dir}/error_{uuid.uuid4().hex}.png"
+        driver.save_screenshot(filename)
+        print(f"❌ Screenshot saved at: {filename}")
+        raise Exception(f"Carrefour search bar not found (timeout or overlay issue): {e}")
     finally:
         driver.quit()
 
+# API endpoint for reorder
 @app.route("/reorder", methods=["POST"])
 def reorder_item():
     try:
@@ -68,13 +97,10 @@ def reorder_item():
         print(f"🛒 Items received: {[item]}")
         add_to_cart_carrefour(item)
         return jsonify({"item": item, "status": "success"}), 200
-
     except Exception as e:
-        import traceback
-        print("❌ Internal server error:", str(e))
-        traceback.print_exc()  # 🔍 This will print full stack trace to Railway logs
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# Start Flask server
 def main():
     port = int(os.environ.get("PORT", 8080))
     print(f"🚀 Thaar is live at http://0.0.0.0:{port}")
