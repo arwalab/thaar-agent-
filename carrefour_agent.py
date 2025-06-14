@@ -1,51 +1,76 @@
-# ✅ Updated carrefour_agent.py to support batch item processing (for Railway deployment)
-
 from flask import Flask, request, jsonify
-import os
 import json
-from oauth2client.service_account import ServiceAccountCredentials
-import gspread
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 app = Flask(__name__)
 
-# Load item list from Google Sheets
-def load_items_from_sheet():
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds_dict = json.loads(os.environ["GOOGLE_SHEETS_CREDENTIALS_JSON"])
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1qhPYmOREyR8ShPJbMAxmvzD96cVluToZ5iLA94KxHng/edit").worksheet("Food inventory")
-    return sheet.get_all_records()
+# ✅ Launch Chrome with ThaarSession and remote debugging (must be running)
+DEBUGGING_URL = "http://127.0.0.1:9222"
+
+# ✅ Helper to connect to the existing Chrome session via remote debugging
+def attach_to_thaar_session():
+    chrome_options = Options()
+    chrome_options.debugger_address = "127.0.0.1:9222"
+    driver = webdriver.Chrome(options=chrome_options)
+    return driver
+
+# ✅ Search and add product to cart on Carrefour
+def add_to_cart_carrefour(item_name):
+    driver = attach_to_thaar_session()
+    driver.get("https://www.carrefourksa.com/mafsau/en/")
+
+    wait = WebDriverWait(driver, 15)
+    print("⏳ Waiting for search bar...")
+
+    try:
+        search_box = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='search']")))
+        search_box.clear()
+        search_box.send_keys(item_name)
+        search_box.send_keys(Keys.RETURN)
+
+        print(f"🔍 Searched: {item_name}")
+
+        product = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.product-tile-container, div.product-list__item")))
+        print(f"✅ Found product: {item_name}")
+
+        add_button = product.find_element(By.XPATH, ".//button[contains(., 'Add') or contains(., 'Add to Cart')]")
+        add_button.click()
+
+        print(f"🛒 Clicked 'Add to cart' for: {item_name}")
+    except Exception as e:
+        print(f"❌ Failed to add {item_name} to cart: {e}")
+    finally:
+        driver.quit()
 
 @app.route("/reorder", methods=["POST"])
-def reorder_items():
+def reorder_item():
     data = request.get_json(force=True)
     print("✅ Raw request data:", data)
 
-    if isinstance(data, dict):
-        # Single item case
-        items = [data.get("item")]
-    elif isinstance(data, list):
-        # List of items
-        items = [entry.get("item") for entry in data if "item" in entry]
-    else:
-        return jsonify({"error": "Invalid request format"}), 400
+    items = data.get("item")
+    if not items:
+        return jsonify({"error": "Missing 'item' in request"}), 400
+
+    if isinstance(items, str):
+        items = [items]
 
     print("🛒 Items received:", items)
-    
-    results = []
+
     for item in items:
-        if item:
-            # Simulate a reorder operation
-            print(f"📦 Reordering: {item}")
-            results.append({"item": item, "status": "success"})
-        else:
-            results.append({"item": None, "status": "skipped - no item"})
+        print(f"\n📦 Reordering: {item}")
+        add_to_cart_carrefour(item)
 
-    return jsonify(results), 200
+    return jsonify({"items": items, "status": "success"}), 200
 
-# Entrypoint
-if __name__ == "__main__":
+def main():
     port = int(os.environ.get("PORT", 8080))
     print(f"\n🚀 Thaar is live at http://0.0.0.0:{port}\n")
     app.run(host="0.0.0.0", port=port)
+
+if __name__ == "__main__":
+    main()
