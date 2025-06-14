@@ -33,43 +33,24 @@ def attach_to_thaar_session():
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
-def add_to_cart_carrefour(item_name):
+def test_google_search(item_name):
     driver = attach_to_thaar_session()
     try:
-        driver.get("https://www.carrefourksa.com/mafsau/en/")
+        driver.get("https://www.google.com")
 
-        # Ensure cookie popup is dismissed before proceeding
-        try:
-            print("🧼 Checking for cookie overlay...", flush=True)
-            accept_button = WebDriverWait(driver, 8).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-testid='uc-accept-all-button']"))
-            )
-            accept_button.click()
-            print("🍪 Cookie popup closed.", flush=True)
-            time.sleep(2)
-        except:
-            print("⚠️ No cookie popup found or already dismissed.", flush=True)
-
-        # Wait for body and scroll to trigger JS loading
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.NAME, "q"))
         )
-        time.sleep(2)
-        driver.execute_script("window.scrollTo(0, 500);")
-        print("⏳ Page body and scroll loaded", flush=True)
 
-        # Wait for search bar
-        try:
-            print("🔎 Waiting for search bar...", flush=True)
-            search = WebDriverWait(driver, 20).until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, "input[data-testid='header_search__inp']"))
-            )
-            search.send_keys(item_name)
-            search.send_keys(Keys.RETURN)
-            print(f"📦 Reordering: {item_name}", flush=True)
-            time.sleep(5)
-        except Exception as e:
-            raise Exception("Carrefour search bar not found (timeout or overlay issue): " + str(e))
+        search = driver.find_element(By.NAME, "q")
+        search.send_keys(item_name)
+        search.send_keys(Keys.RETURN)
+
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "h3"))
+        )
+        first_result = driver.find_element(By.CSS_SELECTOR, "h3").text
+        print(f"🔍 First search result for '{item_name}': {first_result}", flush=True)
 
     finally:
         driver.quit()
@@ -84,7 +65,7 @@ def reorder_item():
             return jsonify({"error": "Missing 'item' in request"}), 400
 
         print(f"🛒 Items received: {[item]}")
-        add_to_cart_carrefour(item)
+        test_google_search(item)
         return jsonify({"item": item, "status": "success"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
