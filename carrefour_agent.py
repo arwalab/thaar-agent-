@@ -1,3 +1,5 @@
+# ✅ Updated carrefour_agent.py to support batch item processing (for Railway deployment)
+
 from flask import Flask, request, jsonify
 import os
 import json
@@ -6,51 +8,44 @@ import gspread
 
 app = Flask(__name__)
 
-# --------------------------
-# 🔐 Google Sheets Function
-# --------------------------
+# Load item list from Google Sheets
 def load_items_from_sheet():
-    scope = [
-        'https://spreadsheets.google.com/feeds',
-        'https://www.googleapis.com/auth/drive'
-    ]
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds_dict = json.loads(os.environ["GOOGLE_SHEETS_CREDENTIALS_JSON"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    sheet = client.open_by_url(
-        "https://docs.google.com/spreadsheets/d/1qhPYmOREyR8ShPJbMAxmvzD96cVluToZ5iLA94KxHng/edit"
-    ).worksheet("Food inventory")
+    sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1qhPYmOREyR8ShPJbMAxmvzD96cVluToZ5iLA94KxHng/edit").worksheet("Food inventory")
     return sheet.get_all_records()
 
-# --------------------------
-# 🚚 API Endpoint for Reorder
-# --------------------------
 @app.route("/reorder", methods=["POST"])
-def reorder_item():
-    try:
-        data = request.get_json(force=True)
-        print("\n✅ Raw request data:", data)
+def reorder_items():
+    data = request.get_json(force=True)
+    print("✅ Raw request data:", data)
 
-        item = data.get("item")
-        if not item:
-            return jsonify({"error": "Missing 'item' in request"}), 400
+    if isinstance(data, dict):
+        # Single item case
+        items = [data.get("item")]
+    elif isinstance(data, list):
+        # List of items
+        items = [entry.get("item") for entry in data if "item" in entry]
+    else:
+        return jsonify({"error": "Invalid request format"}), 400
 
-        print(f"🛒 Item received: {item}")
-        # Optionally you could perform product lookup, automation, etc.
+    print("🛒 Items received:", items)
+    
+    results = []
+    for item in items:
+        if item:
+            # Simulate a reorder operation
+            print(f"📦 Reordering: {item}")
+            results.append({"item": item, "status": "success"})
+        else:
+            results.append({"item": None, "status": "skipped - no item"})
 
-        return jsonify({"item": item, "status": "success"}), 200
+    return jsonify(results), 200
 
-    except Exception as e:
-        print("❌ Error processing request:", str(e))
-        return jsonify({"error": str(e)}), 500
-
-# --------------------------
-# 🚀 Launch Flask App
-# --------------------------
-def main():
-    port = int(os.environ.get("PORT", 5000))
-    print(f"\n🚀 Thaar is live at http://0.0.0.0:{port}")
-    app.run(host="0.0.0.0", port=port)
-
+# Entrypoint
 if __name__ == "__main__":
-    main()
+    port = int(os.environ.get("PORT", 8080))
+    print(f"\n🚀 Thaar is live at http://0.0.0.0:{port}\n")
+    app.run(host="0.0.0.0", port=port)
