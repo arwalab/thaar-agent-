@@ -44,10 +44,10 @@ def add_to_cart_carrefour(item_name):
         
         # Wait for the search bar to appear
         WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.ID, "home_search_input"))
+            EC.presence_of_element_located((By.ID, "home_search_btn"))
         )
 
-        search = driver.find_element(By.ID, "home_search_input")
+        search = driver.find_element(By.ID, "home_search_btn")
         search.clear()
         search.send_keys(item_name)
         search.send_keys(Keys.RETURN)
