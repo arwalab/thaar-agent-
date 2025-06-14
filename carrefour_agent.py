@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import os
 import json
+import tempfile
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 from selenium import webdriver
@@ -25,13 +26,13 @@ def load_items_from_sheet():
 
 def attach_to_thaar_session():
     chrome_options = Options()
-    # Uncomment for headless once stable:
+    # Uncomment for debugging locally:
     # chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.binary_location = "/usr/bin/chromium"
 
-    # ✅ Add a unique user-data-dir to avoid session reuse issues
+    # Add a unique user data dir to prevent session reuse issues
     user_data_dir = tempfile.mkdtemp()
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
