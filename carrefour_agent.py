@@ -39,25 +39,23 @@ def test_google_search(item_name):
     try:
         driver.get("https://www.google.com")
 
-        search = WebDriverWait(driver, 10).until(
-            EC.visibility_of_element_located((By.NAME, "q"))
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.NAME, "q"))
         )
 
-        # Make sure it's focused and visible before typing
-        driver.execute_script("arguments[0].scrollIntoView(true);", search)
-        time.sleep(1)
-        search.click()
-        time.sleep(0.5)
-        search.send_keys(item_name)
-        search.send_keys(Keys.RETURN)
+        search_box = driver.find_element(By.NAME, "q")
+
+        # Use JavaScript to set value and submit form to avoid "click intercepted"
+        driver.execute_script("arguments[0].value = arguments[1];", search_box, item_name)
+        search_box.send_keys(Keys.RETURN)
 
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "h3"))
         )
+
         first_result = driver.find_element(By.CSS_SELECTOR, "h3").text
         print(f"🔍 First search result for '{item_name}': {first_result}", flush=True)
 
-        # Save a screenshot for debugging in headless mode
         screenshot_path = f"/tmp/{item_name.replace(' ', '_')}_search.png"
         driver.save_screenshot(screenshot_path)
         print(f"📸 Screenshot saved to: {screenshot_path}", flush=True)
