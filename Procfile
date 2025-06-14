@@ -1,1 +1,1 @@
-web: gunicorn carrefour_agent:app
+web: python carrefour_agent.py
