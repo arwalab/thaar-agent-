@@ -68,7 +68,11 @@ def reorder_item():
         print(f"🛒 Items received: {[item]}")
         add_to_cart_carrefour(item)
         return jsonify({"item": item, "status": "success"}), 200
+
     except Exception as e:
+        import traceback
+        print("❌ Internal server error:", str(e))
+        traceback.print_exc()  # 🔍 This will print full stack trace to Railway logs
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def main():
