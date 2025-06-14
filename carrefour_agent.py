@@ -13,7 +13,7 @@ import time
 
 app = Flask(__name__)
 
-# Google Sheets setup (optional for future automation)
+# Google Sheets setup (optional for future enhancements)
 def load_items_from_sheet():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds_dict = json.loads(os.environ["GOOGLE_SHEETS_CREDENTIALS_JSON"])
@@ -29,32 +29,41 @@ def attach_to_thaar_session():
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.binary_location = "/usr/bin/chromium"
-    return webdriver.Chrome(options=chrome_options)
+
+    driver = webdriver.Chrome(options=chrome_options)
+    return driver
 
 def add_to_cart_carrefour(item_name):
     driver = attach_to_thaar_session()
     try:
         driver.get("https://www.carrefourksa.com/mafsau/en/")
-        time.sleep(2)
 
-        # Try to dismiss cookie popup if it exists
+        # Ensure cookie popup is dismissed before proceeding
         try:
             print("🧼 Checking for cookie overlay...", flush=True)
-            accept_button = WebDriverWait(driver, 5).until(
+            accept_button = WebDriverWait(driver, 8).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-testid='uc-accept-all-button']"))
             )
             accept_button.click()
             print("🍪 Cookie popup closed.", flush=True)
+            time.sleep(2)
         except:
             print("⚠️ No cookie popup found or already dismissed.", flush=True)
 
-        # Now wait for the search bar
+        # Wait for body and scroll to trigger JS loading
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+        time.sleep(2)
+        driver.execute_script("window.scrollTo(0, 500);")
+        print("⏳ Page body and scroll loaded", flush=True)
+
+        # Wait for search bar
         try:
             print("🔎 Waiting for search bar...", flush=True)
-            WebDriverWait(driver, 12).until(
+            search = WebDriverWait(driver, 20).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "input[data-testid='header_search__inp']"))
             )
-            search = driver.find_element(By.CSS_SELECTOR, "input[data-testid='header_search__inp']")
             search.send_keys(item_name)
             search.send_keys(Keys.RETURN)
             print(f"📦 Reordering: {item_name}", flush=True)
@@ -69,12 +78,12 @@ def add_to_cart_carrefour(item_name):
 def reorder_item():
     try:
         data = request.get_json(force=True)
-        print("✅ Raw request data:", data, flush=True)
+        print("✅ Raw request data:", data)
         item = data.get("item")
         if not item:
             return jsonify({"error": "Missing 'item' in request"}), 400
 
-        print(f"🛒 Items received: {[item]}", flush=True)
+        print(f"🛒 Items received: {[item]}")
         add_to_cart_carrefour(item)
         return jsonify({"item": item, "status": "success"}), 200
     except Exception as e:
@@ -82,7 +91,7 @@ def reorder_item():
 
 def main():
     port = int(os.environ.get("PORT", 8080))
-    print(f"🚀 Thaar is live at http://0.0.0.0:{port}", flush=True)
+    print(f"🚀 Thaar is live at http://0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
