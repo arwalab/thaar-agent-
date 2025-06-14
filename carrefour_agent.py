@@ -25,7 +25,8 @@ def load_items_from_sheet():
 
 def attach_to_thaar_session():
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new")
+    # Uncomment for debugging locally:
+    # chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.binary_location = "/usr/bin/chromium"
@@ -51,6 +52,11 @@ def test_google_search(item_name):
         )
         first_result = driver.find_element(By.CSS_SELECTOR, "h3").text
         print(f"🔍 First search result for '{item_name}': {first_result}", flush=True)
+
+        # Save a screenshot for debugging in headless mode
+        screenshot_path = f"/tmp/{item_name.replace(' ', '_')}_search.png"
+        driver.save_screenshot(screenshot_path)
+        print(f"📸 Screenshot saved to: {screenshot_path}", flush=True)
 
     finally:
         driver.quit()
