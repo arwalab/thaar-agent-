@@ -13,7 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 app = Flask(__name__)
 
-# Google Sheets setup (optional for future use)
+# Optional: Load items from sheet (can be expanded later)
 def load_items_from_sheet():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds_dict = json.loads(os.environ["GOOGLE_SHEETS_CREDENTIALS_JSON"])
@@ -23,7 +23,7 @@ def load_items_from_sheet():
     data = sheet.get_all_records()
     return data
 
-# Attach to headless Chrome session
+# Attach to headless Chrome
 def attach_to_thaar_session():
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
@@ -31,29 +31,37 @@ def attach_to_thaar_session():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.binary_location = "/usr/bin/chromium"
 
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = webdriver.Chrome(
+        options=chrome_options,
+    )
     return driver
 
-# Perform Carrefour search automation
+# Main automation: Carrefour search & add to cart
 def add_to_cart_carrefour(item_name):
     driver = attach_to_thaar_session()
     try:
         driver.get("https://www.carrefourksa.com/mafsau/en/")
-        wait = WebDriverWait(driver, 20)  # wait up to 20 seconds
+        
+        # Wait for the search bar to appear
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "home_search_input"))
+        )
 
-        try:
-            search_box = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="header_search__input"]')))
-        except:
-            raise Exception("Carrefour search bar not found (timeout)")
+        search = driver.find_element(By.ID, "home_search_input")
+        search.clear()
+        search.send_keys(item_name)
+        search.send_keys(Keys.RETURN)
 
-        search_box.send_keys(item_name)
-        search_box.send_keys(Keys.RETURN)
         print(f"📦 Reordering: {item_name}")
-        time.sleep(5)  # wait for search results to load
+        time.sleep(5)  # Wait for search results to load (can be improved)
+
+    except Exception as e:
+        raise Exception(f"Carrefour search bar not found (timeout): {str(e)}")
 
     finally:
         driver.quit()
 
+# Endpoint
 @app.route("/reorder", methods=["POST"])
 def reorder_item():
     try:
@@ -70,6 +78,7 @@ def reorder_item():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# Run the app
 def main():
     port = int(os.environ.get("PORT", 8080))
     print(f"🚀 Thaar is live at http://0.0.0.0:{port}")
