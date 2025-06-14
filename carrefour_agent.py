@@ -7,6 +7,8 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time
 
 app = Flask(__name__)
@@ -35,15 +37,18 @@ def add_to_cart_carrefour(item_name):
     driver = attach_to_thaar_session()
     try:
         driver.get("https://www.carrefourksa.com/mafsau/en/")
-        time.sleep(4)
 
-        # ✅ Fixed selector: use ID based on inspected HTML
+        # Wait for the search bar to load
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "search-bar"))
+        )
+
         search = driver.find_element(By.ID, "search-bar")
         search.send_keys(item_name)
         search.send_keys(Keys.RETURN)
 
         print(f"📦 Reordering: {item_name}")
-        time.sleep(5)
+        time.sleep(5)  # Optional: wait for results to appear
     finally:
         driver.quit()
 
@@ -60,7 +65,6 @@ def reorder_item():
         add_to_cart_carrefour(item)
         return jsonify({"item": item, "status": "success"}), 200
     except Exception as e:
-        print(f"❌ Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def main():
